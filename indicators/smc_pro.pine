@@ -1,0 +1,94 @@
+//@version=5
+indicator("Smart Money Concepts PRO [FVG + OB + Liquidity] by Local AI", overlay=true, max_boxes_count=500, max_lines_count=500)
+
+// ==========================================
+// 1. FAIR VALUE GAP (FVG / IMBALANCE)
+// ==========================================
+show_fvg = input.bool(true, "Show Fair Value Gaps (FVG)", group="Fair Value Gaps")
+bull_fvg_col = input.color(color.new(color.teal, 80), "Bullish FVG Color", group="Fair Value Gaps")
+bear_fvg_col = input.color(color.new(color.maroon, 80), "Bearish FVG Color", group="Fair Value Gaps")
+extend_fvg = input.int(20, "Max Bars to Extend Unmitigated FVG", minval=1, maxval=100, group="Fair Value Gaps")
+
+// Detection of 3-candle FVG patterns
+is_bull_fvg = low > high[2] and show_fvg
+is_bear_fvg = high < low[2] and show_fvg
+
+if is_bull_fvg
+    box.new(left=bar_index - 2, top=low, right=bar_index + extend_fvg, bottom=high[2], 
+            border_color=color.teal, bgcolor=bull_fvg_col)
+
+if is_bear_fvg
+    box.new(left=bar_index - 2, top=low[2], right=bar_index + extend_fvg, bottom=high, 
+            border_color=color.maroon, bgcolor=bear_fvg_col)
+
+// ==========================================
+// 2. ORDER BLOCKS (OB)
+// ==========================================
+show_ob = input.bool(true, "Show Order Blocks (OB)", group="Order Blocks")
+ob_length = input.int(5, "Swing Strength", minval=2, maxval=20, group="Order Blocks")
+bull_ob_col = input.color(color.new(color.green, 75), "Bullish OB", group="Order Blocks")
+bear_ob_col = input.color(color.new(color.red, 75), "Bearish OB", group="Order Blocks")
+
+swing_high = ta.pivothigh(high, ob_length, ob_length)
+swing_low = ta.pivotlow(low, ob_length, ob_length)
+
+var float last_swing_high = na
+var float last_swing_low = na
+
+if not na(swing_high)
+    last_swing_high := swing_high
+
+if not na(swing_low)
+    last_swing_low := swing_low
+
+// Break of Structure (BOS) detecting OB
+is_bos_up = ta.crossover(close, last_swing_high)
+is_bos_down = ta.crossunder(close, last_swing_low)
+
+if is_bos_up and show_ob
+    // Last down candle
+    box.new(left=bar_index - ob_length, top=high[ob_length], right=bar_index + 30, bottom=low[ob_length],
+            border_color=color.green, bgcolor=bull_ob_col)
+
+if is_bos_down and show_ob
+    // Last up candle
+    box.new(left=bar_index - ob_length, top=high[ob_length], right=bar_index + 30, bottom=low[ob_length],
+            border_color=color.red, bgcolor=bear_ob_col)
+
+// ==========================================
+// 3. ASIAN SESSION LIQUIDITY RANGE
+// ==========================================
+show_asia = input.bool(true, "Show Asian Session Range (Liquidity)", group="Asian Session")
+asia_session = input.session("0000-0800:1234567", "Asian Session (UTC)", group="Asian Session")
+asia_color = input.color(color.new(color.purple, 85), "Asian Box Fill", group="Asian Session")
+
+in_session = not na(time(timeframe.period, asia_session + ":UTC"))
+var float asia_high = na
+var float asia_low = na
+var int asia_start_bar = na
+
+if in_session and not in_session[1]
+    // Session Started
+    asia_high := high
+    asia_low := low
+    asia_start_bar := bar_index
+else if in_session
+    asia_high := math.max(asia_high, high)
+    asia_low := math.min(asia_low, low)
+else if not in_session and in_session[1] and show_asia
+    // Session Ended: Draw range box
+    box.new(left=asia_start_bar, top=asia_high, right=bar_index, bottom=asia_low,
+            border_color=color.purple, bgcolor=asia_color)
+    // Draw Liquidity High & Low lines
+    line.new(x1=asia_start_bar, y1=asia_high, x2=bar_index + 40, y2=asia_high, 
+             color=color.purple, style=line.style_dashed, width=1)
+    line.new(x1=asia_start_bar, y1=asia_low, x2=bar_index + 40, y2=asia_low, 
+             color=color.purple, style=line.style_dashed, width=1)
+
+// ==========================================
+// 4. ALERTS
+// ==========================================
+alertcondition(is_bull_fvg, title="Bullish FVG Formed", message="[SMC Alert] Bullish FVG created on {{ticker}}!")
+alertcondition(is_bear_fvg, title="Bearish FVG Formed", message="[SMC Alert] Bearish FVG created on {{ticker}}!")
+alertcondition(is_bos_up, title="BOS Bullish Breakout", message="[SMC Alert] Bullish BOS breakout on {{ticker}}!")
+alertcondition(is_bos_down, title="BOS Bearish Breakdown", message="[SMC Alert] Bearish BOS breakdown on {{ticker}}!")

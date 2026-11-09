@@ -8,15 +8,17 @@ import threading
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load configuration from .env in project root
 ROOT_DIR = Path(__file__).resolve().parent.parent
+sys.path.append(str(ROOT_DIR))
+
 load_dotenv(ROOT_DIR / ".env")
+
+from shared.voice_transcriber import transcribe_telegram_voice
 
 BOT_TOKEN = os.getenv("ASSISTANT_BOT_TOKEN")
 LM_STUDIO_URL = os.getenv("LM_STUDIO_URL", "http://127.0.0.1:1234/v1/chat/completions")
 MODEL_NAME = os.getenv("MODEL_NAME", "huihui-qwen3.6-35b-a3b-claude-4.7-opus-abliterated")
 
-# Whitelist of allowed user IDs
 raw_ids = os.getenv("ALLOWED_USER_IDS", "")
 ALLOWED_USER_IDS = [int(x.strip()) for x in raw_ids.split(",") if x.strip().isdigit()]
 
@@ -97,14 +99,14 @@ def query_local_model(chat_id, prompt):
             return f"⚠️ Ошибка от LM Studio (код {response.status_code}): {response.text}"
     except requests.exceptions.ConnectionError:
         stop_typing = True
-        return "⚠️ Не удалось подключиться к LM Studio. Убедитесь, что в LM Studio запущен Local Server (зеленый статус)."
+        return "⚠️ Не удалось подключиться к LM Studio. Убедитесь, что запущен Local Server на http://127.0.0.1:1234."
     except Exception as e:
         stop_typing = True
         return f"⚠️ Произошла ошибка: {str(e)}"
 
 def process_updates():
     offset = None
-    logging.info("Protected Personal Assistant Bot started...")
+    logging.info("Protected Personal Assistant Bot (with Voice support) started...")
     while True:
         try:
             params = {"timeout": 20}
@@ -136,19 +138,29 @@ def process_updates():
                     continue
 
                 text = message.get("text", "")
+                is_voice = False
+
+                # Handle Voice Message
+                if not text and message.get("voice"):
+                    send_chat_action(chat_id, "record_voice")
+                    file_id = message["voice"]["file_id"]
+                    text = transcribe_telegram_voice(BOT_TOKEN, file_id)
+                    is_voice = True
+
                 if not text:
                     continue
 
-                logging.info(f"Authorized message from {chat_id}: {text[:50]}...")
+                logging.info(f"Authorized message from {chat_id} (voice={is_voice}): {text[:50]}...")
 
                 if text == "/start":
                     welcome = (
                         "👋 Привет! Я твой защищенный личный ассистент на базе **Huihui-Qwen3.6-35B**!\n\n"
                         "🔒 Режим доступа: **Персональный (только для вас)**.\n"
-                        "⚡ Инференс: локальный LM Studio на вашем ПК.\n\n"
+                        "⚡ Инференс: локальный LM Studio на вашем ПК.\n"
+                        "🎙️ **Поддержка голосовых:** просто отправь аудио/голосовое сообщение — я расшифрую его локально через Whisper и отвечу!\n\n"
                         "Команды:\n"
                         "• /reset — очистить память диалога\n"
-                        "• Напиши любой вопрос, задачу или код!"
+                        "• Напиши или надиктуй любой вопрос!"
                     )
                     send_message(chat_id, welcome)
                     continue
@@ -159,6 +171,8 @@ def process_updates():
                     continue
 
                 reply = query_local_model(chat_id, text)
+                if is_voice:
+                    reply = f"🎙️ *Распознано:* «{text}»\n\n{reply}"
                 send_message(chat_id, reply)
 
         except Exception as e:
