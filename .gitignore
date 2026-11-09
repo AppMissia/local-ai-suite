@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+.env
+config.env
+*.log
+
+# Virtual Environments
+venv/
+env/
+.venv/
+
+# Audio temp files
+*.ogg
+*.wav
+*.mp3
+
+# OS files
+Thumbs.db
+.DS_Store
