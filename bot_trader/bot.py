@@ -24,13 +24,23 @@ user_histories = {}
 MAX_HISTORY_MESSAGES = 10
 
 SYSTEM_PROMPT = (
-    "Ты — профессиональный трейдер-аналитик и эксперт по концепциям Smart Money (SMC), Price Action и криптовалютному рынку. "
+    "Ты — элитный трейдер-аналитик, квант и эксперт по концепциям Smart Money (SMC), Price Action и криптовалютному рынку.\n"
     "Твои специализации:\n"
-    "1. Анализ рыночной структуры: Order Block (OB), Fair Value Gap (FVG), Liquidity Sweeps, BOS, CHoCH, Premium/Discount зоны.\n"
-    "2. Риск-менеджмент: расчет Risk/Reward (R:R), уровней инвалидации (Stop Loss) и фиксации (Take Profit), контроль плеча.\n"
-    "3. Разработка: написание индикаторов и стратегий на Pine Script (TradingView v5), скриптов на Python (ccxt, pandas_ta, Bybit/Binance API).\n"
-    "4. Саммари новостей: выжимка сути без воды из новостных лент и постов с упором на влияние на волатильность.\n"
-    "Отвечай четко, структурированно, профессионально и без шаблонных отговорок."
+    "1. **Smart Money Concepts (SMC):**\n"
+    "   - Идентификация Order Block (OB), Fair Value Gap (FVG / Имбаланс), Liquidity Sweeps (снятие ликвидности / охота за стопами), Inducement (IDM).\n"
+    "   - Определение структуры: BOS (Break of Structure), CHoCH (Change of Character), Premium/Discount зоны по Fibonacci (0.618-0.786 OTE).\n"
+    "2. **Кодинг и автоматизация (Pine Script v5):**\n"
+    "   - Написание рабочих, оптимизированных скриптов и индикаторов для TradingView (версия strictly //@version=5).\n"
+    "   - Добавление алертов через alertcondition() и визуальных меток на графике.\n"
+    "   - Написание Python-скриптов для Bybit/Binance API и ccxt (парсеры, трекинг ликвидаций, сканеры объемов).\n"
+    "3. **Аналитика новостей и постов (Саммари без воды):**\n"
+    "   - При анализе новостей или пересланных сообщений выдавай структуру:\n"
+    "     • Ключевой факт (в 1-2 предложениях)\n"
+    "     • Влияние на рынок (бычье / медвежье / всплеск волатильности)\n"
+    "     • Торговые выводы и зоны внимания\n"
+    "4. **Риск-менеджмент:**\n"
+    "   - Всегда проверяй Risk/Reward (минимум 1:2.5, идеал 1:3+), четкий уровень инвалидации сэтапа (Stop Loss).\n"
+    "Отвечай уверенно, профессионально, структурированно, используй форматирование списков и блоков кода."
 )
 
 def send_telegram_request(method, data=None):
@@ -66,8 +76,8 @@ def query_local_model(chat_id, prompt):
     payload = {
         "model": MODEL_NAME,
         "messages": user_histories[chat_id],
-        "temperature": 0.5, # Slightly lower temperature for trading/math precision
-        "max_tokens": 2048
+        "temperature": 0.45,  # High precision for financial analysis and code
+        "max_tokens": 2500
     }
 
     stop_typing = False
@@ -97,18 +107,18 @@ def query_local_model(chat_id, prompt):
             return f"⚠️ Ошибка от LM Studio (код {response.status_code}): {response.text}"
     except requests.exceptions.ConnectionError:
         stop_typing = True
-        return "⚠️ Не удалось подключиться к LM Studio. Убедитесь, что Local Server активен."
+        return "⚠️ Не удалось подключиться к LM Studio. Убедитесь, что запущен Local Server на http://127.0.0.1:1234."
     except Exception as e:
         stop_typing = True
         return f"⚠️ Произошла ошибка: {str(e)}"
 
 def process_updates():
     if not BOT_TOKEN:
-        logging.error("TRADER_BOT_TOKEN is empty! Please add TRADER_BOT_TOKEN into .env file.")
+        logging.error("TRADER_BOT_TOKEN is empty! Please check .env file.")
         return
 
     offset = None
-    logging.info("Protected Smart Money & Crypto Trader Bot started...")
+    logging.info("Crypto & Smart Money Trader Bot started listening...")
     while True:
         try:
             params = {"timeout": 20}
@@ -133,9 +143,10 @@ def process_updates():
 
                 chat_id = message["chat"]["id"]
 
+                # Whitelist authorization
                 if ALLOWED_USER_IDS and chat_id not in ALLOWED_USER_IDS:
                     logging.warning(f"Unauthorized trader bot access from ID: {chat_id}")
-                    send_message(chat_id, "⛔ Доступ ограничен.")
+                    send_message(chat_id, "⛔ Доступ ограничен. Этот бот настроен только для персональной торговли владельца.")
                     continue
 
                 text = message.get("text", "")
@@ -146,31 +157,43 @@ def process_updates():
 
                 if text == "/start":
                     welcome = (
-                        "📈 **Smart Money & Crypto Trader AI**\n\n"
-                        "Я твой локальный ИИ-ассистент по трейдингу на базе **Qwen 35B (Claude Opus)**.\n\n"
-                        "🎯 **Чем я могу помочь:**\n"
-                        "• Анализ сэтапов: Order Blocks, FVG, пулы ликвидности, BOS/CHoCH\n"
-                        "• Расчет риск-менеджмента (R:R, объем позиции, стоп/тейк)\n"
-                        "• Написание индикаторов на **Pine Script v5** для TradingView\n"
-                        "• Скрипты на Python (ccxt, Bybit/Binance API)\n"
-                        "• Разбор новостей и сигналов без «воды»\n\n"
+                        "📊 **Crypto & Smart Money Trader AI** (@forexyeah777_bot)\n\n"
+                        "Я твой локальный ИИ-аналитик на базе модели **Huihui-Qwen3.6-35B (Claude Opus)**.\n\n"
+                        "⚡ **Что я умею:**\n"
+                        "🔹 **Smart Money (SMC):** разбор сэтапов, FVG, Order Blocks, Liquidity Sweeps, BOS/CHoCH, Premium/Discount.\n"
+                        "🔹 **Pine Script v5:** генерация индикаторов и алертов для TradingView под любую стратегию.\n"
+                        "🔹 **Python скрипты:** код для сбора данных с Bybit/Binance, сканеры объемов и стаканов.\n"
+                        "🔹 **Саммари постов:** просто перешли сюда новость или пост из каналов — выдам сухую суть и влияние на рынок.\n"
+                        "🔹 **Риск-менеджмент:** расчет размера позиции и R:R.\n\n"
                         "Команды:\n"
-                        "• /reset — очистить память диалога\n"
-                        "Отправь сэтап, вопрос или код стратегии!"
+                        "• `/smc [описание сэтапа]` — мгновенный разбор сделки\n"
+                        "• `/pine [идея индикатора]` — написать код для TradingView\n"
+                        "• `/news [текст]` — быстрая выжимка новости без спама\n"
+                        "• `/reset` — очистить память диалога\n\n"
+                        "Либо просто напиши любой вопрос или опиши сделку!"
                     )
                     send_message(chat_id, welcome)
                     continue
 
                 if text in ["/reset", "/clear"]:
                     user_histories[chat_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
-                    send_message(chat_id, "🧹 Память торгового диалога очищена!")
+                    send_message(chat_id, "🧹 Память торгового контекста очищена! Готов к новым сэтапам.")
                     continue
 
-                reply = query_local_model(chat_id, text)
+                # Process command prefixes or normal queries
+                prompt = text
+                if text.startswith("/smc"):
+                    prompt = "Проведи детальный Smart Money разбор следующего сэтапа/ситуации: " + text[4:].strip()
+                elif text.startswith("/pine"):
+                    prompt = "Напиши чистый, рабочий код индикатора/стратегии на TradingView Pine Script (версия strict //@version=5) со всеми алертами и пояснениями по следующему ТЗ: " + text[5:].strip()
+                elif text.startswith("/news"):
+                    prompt = "Сделай профессиональную трейдерскую выжимку без воды следующего текста/новости: " + text[5:].strip()
+
+                reply = query_local_model(chat_id, prompt)
                 send_message(chat_id, reply)
 
         except Exception as e:
-            logging.error(f"Error in update loop: {e}")
+            logging.error(f"Error in trader bot update loop: {e}")
             time.sleep(2)
 
 if __name__ == "__main__":
